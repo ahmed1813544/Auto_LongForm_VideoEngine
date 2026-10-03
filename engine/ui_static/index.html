@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Engine</title>
+<style>
+:root{
+  --bg:#0d1117; --card:#151b23; --card2:#1c2430; --line:#2b3542;
+  --txt:#e6edf3; --dim:#91a0af; --acc:#3fb950; --acc2:#58a6ff;
+  --warn:#d29922; --err:#f85149; --mono:Consolas,"Cascadia Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:14px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;padding:0 16px 40px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;
+  padding:14px 2px;border-bottom:1px solid var(--line);margin-bottom:16px}
+header h1{font-size:19px;margin:0;letter-spacing:.3px}
+#chips{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.chip{background:var(--card2);border:1px solid var(--line);border-radius:20px;
+  padding:2px 10px;font-size:12px;color:var(--dim)}
+.chip b{color:var(--txt);font-weight:600}
+.chip .ok{color:var(--acc)} .chip .no{color:var(--err)}
+main{display:grid;grid-template-columns:minmax(340px,5fr) minmax(320px,4fr);
+  gap:16px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:16px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:15px;text-transform:uppercase;
+  letter-spacing:1px;color:var(--dim)}
+h3{margin:16px 0 6px;font-size:13px;text-transform:uppercase;
+  letter-spacing:.8px;color:var(--dim)}
+label{display:block;margin-bottom:10px;color:var(--dim);font-size:13px}
+input[type=text],input[type=number],select,textarea{
+  width:100%;background:#0a0e14;color:var(--txt);border:1px solid var(--line);
+  border-radius:6px;padding:8px 10px;font:13px/1.4 system-ui,sans-serif}
+textarea{font:13px/1.5 var(--mono);resize:vertical;min-height:180px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc2)}
+button{cursor:pointer;border-radius:6px;border:1px solid var(--line);
+  background:var(--card2);color:var(--txt);padding:7px 14px;font-size:13px}
+button:hover{border-color:var(--acc2)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#04150a;
+  font-weight:700;font-size:15px;padding:11px;width:100%;margin-top:8px;
+  letter-spacing:.5px}
+button.primary:hover{filter:brightness(1.1)}
+button.danger{border-color:var(--err);color:var(--err)}
+button.small{padding:3px 9px;font-size:12px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.row label{margin:0;flex:1;min-width:120px}
+.hint{color:var(--dim);font-size:12px;float:right}
+.msg{margin-top:8px;font-size:13px;min-height:18px}
+.msg.ok{color:var(--acc)} .msg.err{color:var(--err)}
+.planbox{background:var(--card2);border:1px solid var(--line);
+  border-radius:8px;padding:10px 12px;margin-bottom:4px;font-size:13px;
+  display:flex;flex-direction:column;gap:6px}
+.planbox .ok{color:var(--acc)} .planbox .mid{color:var(--warn)}
+.planbox .bad{color:var(--err);font-weight:600} .planbox .d{color:var(--dim)}
+.moodrow{display:flex;gap:6px;margin-bottom:6px}
+.moodrow input{flex:1}
+details{margin:12px 0;border:1px solid var(--line);border-radius:6px;
+  padding:8px 12px;background:var(--card2)}
+summary{cursor:pointer;color:var(--dim);font-size:13px}
+details[open] summary{margin-bottom:10px}
+.checks{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.checks label{display:flex;gap:8px;align-items:center;margin:0;color:var(--txt)}
+.checks input{width:auto}
+/* jobs */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--dim);text-align:left;font-weight:500;padding:4px 6px;
+  border-bottom:1px solid var(--line)}
+td{padding:6px;border-bottom:1px solid #1e2733;vertical-align:middle}
+tr.sel{background:#1a2432}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;
+  font-weight:700;letter-spacing:.4px}
+.badge.run{background:#12291a;color:var(--acc);animation:pulse 1.6s infinite}
+.badge.done{background:#12233a;color:var(--acc2)}
+.badge.fail{background:#2d1416;color:var(--err)}
+.badge.idle{background:#232b36;color:var(--dim)}
+@keyframes pulse{50%{opacity:.55}}
+.bar{height:6px;background:#0a0e14;border-radius:3px;overflow:hidden;
+  min-width:70px}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:3px;
+  transition:width .6s}
+/* active + log */
+#active{border:1px solid var(--line);border-radius:8px;background:var(--card2);
+  padding:12px;margin-bottom:12px}
+#active .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  margin-bottom:8px}
+#active .jid{font-weight:700;font-size:15px;font-family:var(--mono)}
+#phase{color:var(--dim);font-size:13px;margin:6px 0 10px}
+#loghead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  margin-bottom:8px}
+#loghead .t{font-family:var(--mono);font-weight:700}
+pre#log{background:#07090d;border:1px solid var(--line);border-radius:8px;
+  padding:10px 12px;height:340px;overflow:auto;margin:0;
+  font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-word;
+  color:#c9d6e3}
+audio{width:100%;margin-top:8px}
+a.dl{color:var(--acc2);text-decoration:none}
+a.dl:hover{text-decoration:underline}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 Video Engine</h1>
+  <div id="chips"></div>
+</header>
+
+<main>
+  <!-- ============ BUILD FORM ============ -->
+  <section class="card">
+    <h2>New build</h2>
+    <label>Job ID <span class="hint">letters, digits, _ -</span>
+      <input type="text" id="jobid" maxlength="64" placeholder="myvideo">
+    </label>
+    <label>Story script <span class="hint" id="wc">0 words ≈ 0 min</span>
+      <textarea id="script" spellcheck="false"
+        placeholder="Paste your story text here…&#10;&#10;Blank-line paragraphs become chapters. STORY: Title / --- splits multiple stories."></textarea>
+    </label>
+    <div class="row">
+      <input type="file" id="filepick" accept=".txt,text/plain"
+             style="flex:2;min-width:200px">
+      <button id="loadsample" class="small" type="button">Load sample</button>
+    </div>
+
+    <h3>Duration planner <span class="hint">video length = words ÷ ~165 wpm</span></h3>
+    <div class="row">
+      <label style="flex:0 0 110px">Target hours
+        <input type="number" id="thrs" min="0" max="24" placeholder="0">
+      </label>
+      <label style="flex:0 0 110px">Target mins
+        <input type="number" id="tmin" min="0" max="59" placeholder="30">
+      </label>
+      <div class="row" id="dpresets" style="margin:0 0 10px"></div>
+    </div>
+    <div id="plan" class="planbox"></div>
+
+    <h3>Mood terms <span class="hint">stock-footage searches, one per row</span></h3>
+    <div id="moods"></div>
+    <div class="row" id="presets">
+      <button class="small" type="button" id="addmood">+ add row</button>
+    </div>
+
+    <h3>Voice &amp; persona</h3>
+    <div class="row">
+      <label style="flex:1">Persona
+        <select id="persona"></select>
+      </label>
+      <label style="flex:1.6">Narrator voice
+        <select id="voice"></select>
+      </label>
+    </div>
+    <div class="row">
+      <label style="flex:2">…or use your own photo (optional — a man, any
+        face; stays on this machine, never in git)
+        <input type="file" id="personafile" accept=".jpg,.jpeg,.png,.webp">
+      </label>
+      <label style="flex:1;display:flex;gap:6px;align-items:center;
+        color:var(--txt)">
+        <input type="checkbox" id="cutbg" checked> cut out background
+        <span class="hint" id="cuthint"></span>
+      </label>
+      <button id="uploadpersona" class="small" type="button">Upload</button>
+    </div>
+    <div class="msg" id="upmsg"></div>
+    <div class="row">
+      <label style="flex:2">Speed <span id="speedv">1.00×</span>
+        <input type="range" id="speed" min="0.8" max="1.25" step="0.05"
+               value="1" style="width:100%">
+      </label>
+      <button id="preview" class="small" type="button">🔊 Preview voice</button>
+    </div>
+    <audio id="player" controls class="hide"></audio>
+    <div class="msg" id="pvmsg"></div>
+
+    <details>
+      <summary>Advanced</summary>
+      <div class="row">
+        <label>Max segment (min)<input type="number" id="segmax" value="9"
+               min="0.5" max="60" step="0.5"></label>
+        <label>Plan seed<input type="number" id="seed" value="1234"></label>
+      </div>
+      <div class="row">
+        <label>Stock quality
+          <select id="stockq">
+            <option value="720" selected>720p sources — smaller downloads,
+              faster builds (recommended; output stays 1080p)</option>
+            <option value="1080">1080p sources — bigger files, sharpest
+              source</option>
+            <option value="540">540p sources — smallest downloads</option>
+          </select>
+        </label>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="eq" checked>
+          EQ bars (audio-reactive, behind captions)</label>
+        <label><input type="checkbox" id="skipstock">
+          Skip stock footage (test-pattern background — no API keys)</label>
+        <label><input type="checkbox" id="nvenc">
+          NVENC GPU encode (needs ~2 GB VRAM headroom)</label>
+        <label><input type="checkbox" id="fresh">
+          Fresh (wipe resume state, rebuild everything)</label>
+        <label><input type="checkbox" id="dryrun">
+          Dry run (print commands, render nothing)</label>
+      </div>
+    </details>
+
+    <button id="build" class="primary" type="button">▶ BUILD VIDEO</button>
+    <div class="msg" id="buildmsg"></div>
+  </section>
+
+  <!-- ============ JOBS ============ -->
+  <section class="card">
+    <h2>Jobs</h2>
+    <div id="active" class="hide">
+      <div class="top">
+        <span class="jid" id="ajid"></span>
+        <span id="abadge"></span>
+        <span style="margin-left:auto"></span>
+        <button id="stop" class="small danger" type="button">■ Stop</button>
+        <button id="verify" class="small" type="button">✓ Verify</button>
+        <button id="rerun" class="small" type="button">↻ Re-run</button>
+        <a id="amp4" class="dl hide" target="_blank" rel="noopener">▶ Open mp4</a>
+      </div>
+      <div class="bar"><i id="abar" style="width:0%"></i></div>
+      <div id="phase"></div>
+    </div>
+    <table>
+      <thead><tr><th>Job</th><th>Status</th><th>Progress</th>
+        <th>Updated</th><th>mp4</th></tr></thead>
+      <tbody id="jobs"></tbody>
+    </table>
+    <div class="msg" id="jobmsg"></div>
+  </section>
+</main>
+
+<section class="card hide" id="logpanel">
+  <div id="loghead">
+    <span class="t">console — <span id="ljid"></span></span>
+    <label style="display:flex;gap:6px;align-items:center;margin:0">
+      <input type="checkbox" id="autoscroll" checked> autoscroll</label>
+    <button id="closelog" class="small" style="margin-left:auto"
+            type="button">✕ hide</button>
+  </div>
+  <pre id="log"></pre>
+</section>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const S = {cfg:null, jobs:[], sel:null, offset:0, log:"", jobIdDirty:false,
+           busy:false};
+
+const PRESETS = {
+  "🌿 Landscapes": ["green valley morning mist aerial",
+    "mountain ridge sunrise drone", "emerald forest river aerial",
+    "rolling hills fog drone aerial", "alpine lake islands aerial"],
+  "🌧 Moody": ["storm clouds timelapse dark", "rain forest night moody",
+    "foggy pine road aerial", "winter forest snow mist",
+    "dark ocean waves storm"],
+  "🌊 Coastal": ["ocean cliffs waves aerial", "coastal dunes grass drone",
+    "turquoise lagoon aerial", "rocky shore sunset waves",
+    "fjord mountains water drone"],
+  "🏔 Mountains": ["snow mountain peaks aerial", "mountain pass clouds drone",
+    "glacier valley aerial", "sunrise summit timelapse",
+    "mountain lake reflection drone"],
+};
+const WPM = 165;
+// GB per finished minute — lo: mixed scenery, hi: greenery-heavy (aerial
+// foliage encodes ~2x the bitrate at crf 19 — measured ~790 MB / 9-min seg)
+const GB = {scratchLo:0.30, scratchHi:0.50, keepLo:0.09, keepHi:0.18};
+const DUR_PRESETS = [["10 min",0,10],["30 min",0,30],["1 h",1,0],
+                     ["2 h",2,0],["3 h",3,0]];
+
+// ---------- helpers ----------
+async function jget(url){ const r = await fetch(url); const j = await r.json();
+  if(!r.ok) throw new Error(j.error || r.status); return j; }
+async function jpost(url, body){
+  const r = await fetch(url, {method:"POST",
+    headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || ("HTTP "+r.status)); return j; }
+function msg(el, text, ok){ el.textContent = text||"";
+  el.className = "msg" + (text ? (ok?" ok":" err") : ""); }
+function fmtSize(n){ return n>=1e9 ? (n/1e9).toFixed(2)+" GB"
+  : n>=1e6 ? (n/1e6).toFixed(0)+" MB" : (n/1e3).toFixed(0)+" kB"; }
+function fmtAgo(ts){ const s = Math.max(0,(Date.now()/1000)-ts);
+  if(s<60) return "just now"; if(s<3600) return Math.floor(s/60)+"m ago";
+  if(s<86400) return Math.floor(s/3600)+"h ago";
+  return Math.floor(s/86400)+"d ago"; }
+function esc(s){ const d=document.createElement("div"); d.textContent=s;
+  return d.innerHTML; }
+
+// ---------- form bits ----------
+function addMood(v){
+  const row = document.createElement("div");
+  row.className = "moodrow";
+  row.innerHTML = '<input type="text" placeholder="e.g. green valley river drone">'
+    + '<button class="small" type="button" title="remove">✕</button>';
+  row.querySelector("input").value = v||"";
+  row.querySelector("button").onclick = () => row.remove();
+  $("moods").appendChild(row);
+}
+function moodList(){ return [...document.querySelectorAll("#moods input")]
+  .map(i=>i.value.trim()).filter(Boolean); }
+
+function suggestJobId(){
+  if(S.jobIdDirty) return;
+  const w = $("script").value.split(/\s+/).filter(Boolean).slice(0,3);
+  let slug = w.join("-").toLowerCase().replace(/[^a-z0-9-]/g,"")
+    .replace(/-+/g,"-").replace(/^-|-$/g,"").slice(0,40);
+  $("jobid").value = slug || "";
+}
+function fmtDur(min){
+  if(!isFinite(min) || min <= 0) return "—";
+  const h = Math.floor(min/60), m = Math.round(min%60);
+  if(h && m) return h+"h "+String(m).padStart(2,"0")+"m";
+  if(h) return h+"h";
+  return Math.max(1,Math.round(min))+" min";
+}
+function updatePlan(){
+  const words = $("script").value.split(/\s+/).filter(Boolean).length;
+  const vidMin = words/WPM;
+  const th = parseInt($("thrs").value)||0, tm = parseInt($("tmin").value)||0;
+  const target = (th*60+tm) > 0 ? th*60+tm : null;
+  $("wc").textContent = words
+    ? words.toLocaleString()+" words ≈ "+fmtDur(vidMin)+" video"
+    : "0 words ≈ 0 min";
+  const basis = vidMin > 0.2 ? vidMin : (target||0);
+  const rows = [];
+  rows.push(words
+    ? `<div>📏 This script → <b>${fmtDur(vidMin)}</b> video `
+      +`<span class="d">(${words.toLocaleString()} words @ ~${WPM} wpm — `
+      +`length is set by the script, not a dial)</span></div>`
+    : `<div class="d">📏 Paste a script — video length = words ÷ ~${WPM} wpm. `
+      +`A 30-min video needs ≈ ${(30*WPM).toLocaleString()} words.</div>`);
+  if(target){
+    const need = Math.round(target*WPM);
+    let s = `<div>🎯 Target <b>${fmtDur(target)}</b> needs ≈ `
+      +`<b>${need.toLocaleString()} words</b>`;
+    if(words){
+      const diff = words - need;
+      if(Math.abs(diff) < need*0.05)
+        s += ` — <span class="ok">on target ✓ (within 5%)</span>`;
+      else if(diff < 0)
+        s += ` — <span class="mid">${Math.abs(diff).toLocaleString()} words `
+          +`short (≈ ${fmtDur(-diff/WPM)} under)</span>`;
+      else
+        s += ` — <span class="mid">${diff.toLocaleString()} words over `
+          +`(≈ ${fmtDur(diff/WPM)} longer)</span>`;
+    }
+    rows.push(s+"</div>");
+  }
+  const free = S.cfg ? S.cfg.disk_free_gb : null;
+  S.disk = null;
+  if(basis > 0){
+    const sLo = basis*GB.scratchLo, sHi = basis*GB.scratchHi;
+    const kLo = basis*GB.keepLo,    kHi = basis*GB.keepHi;
+    let cls = "ok", mark = "✓", note = "";
+    if(free != null){
+      if(free < sLo){ S.disk = "bad"; cls = "bad"; mark = "⚠";
+        note = " — <b>not enough space.</b> Free old jobs "
+             + "(<code>python -m engine clean</code>) or shorten the video"; }
+      else if(free < sHi){ S.disk = "mid"; cls = "mid"; mark = "⚠";
+        note = " — tight if the footage is greenery-heavy (≈2× bitrate)"; }
+    }
+    rows.push(`<div class="${cls}">💾 Disk: ~${sLo.toFixed(0)}–${sHi.toFixed(0)} GB `
+      +`free needed during the build (~${kLo.toFixed(0)}–${kHi.toFixed(0)} GB kept after)`
+      +(free!=null ? ` — you have <b>${free} GB</b>` : "")+` ${mark}${note}</div>`);
+    const nv = $("nvenc").checked;
+    const rLo = basis*(nv?1.5:3), rHi = basis*(nv?3:6);
+    const tts = Math.max(2, Math.round(basis/12));
+    rows.push(`<div class="d">⏱ Build time: ~${tts} min TTS + `
+      +`<b>${fmtDur(rLo)}–${fmtDur(rHi)}</b> render `
+      +(nv ? "(NVENC GPU)"
+           : "(CPU — tick NVENC under Advanced for ~2× faster)")
+      +` · runs unattended; if it dies, re-run resumes finished segments</div>`);
+  }
+  $("plan").innerHTML = rows.join("");
+}
+function gather(){
+  return {
+    job_id: $("jobid").value.trim(),
+    script_text: $("script").value,
+    moods: moodList(),
+    persona_dir: $("persona").value,
+    voice: $("voice").value,
+    speed: parseFloat($("speed").value),
+    seg_max_min: parseFloat($("segmax").value)||null,
+    seed: $("seed").value===""?null:parseInt($("seed").value),
+    stock_max_h: parseInt($("stockq").value)||720,
+    eq: $("eq").checked, skip_stock: $("skipstock").checked,
+    nvenc: $("nvenc").checked, fresh: $("fresh").checked,
+    dry_run: $("dryrun").checked,
+  };
+}
+
+// ---------- init ----------
+async function init(){
+  for(const [name,terms] of Object.entries(PRESETS)){
+    const b = document.createElement("button");
+    b.className="small"; b.type="button"; b.textContent=name;
+    b.title = terms.join(" · ");
+    b.onclick = ()=>{ $("moods").innerHTML=""; terms.forEach(addMood); };
+    $("presets").appendChild(b);
+  }
+  addMood(); addMood();
+
+  $("script").addEventListener("input", ()=>{suggestJobId(); updatePlan();});
+  $("jobid").addEventListener("input", ()=>{S.jobIdDirty=true;});
+  $("addmood").onclick = ()=>addMood();
+  $("speed").addEventListener("input",
+    ()=>$("speedv").textContent=parseFloat($("speed").value).toFixed(2)+"×");
+  for(const [label,h,m] of DUR_PRESETS){
+    const b = document.createElement("button");
+    b.className="small"; b.type="button"; b.textContent=label;
+    b.onclick = ()=>{ $("thrs").value=h||""; $("tmin").value=m||"";
+                      updatePlan(); };
+    $("dpresets").appendChild(b);
+  }
+  $("thrs").addEventListener("input", updatePlan);
+  $("tmin").addEventListener("input", updatePlan);
+  $("nvenc").addEventListener("change", updatePlan);
+  $("filepick").addEventListener("change", e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{ $("script").value = r.result; suggestJobId();
+                     updatePlan(); };
+    r.readAsText(f);
+  });
+  $("loadsample").onclick = ()=>{
+    $("script").value = S.cfg.sample_script||"";
+    S.jobIdDirty=false; suggestJobId(); updatePlan();
+    msg($("buildmsg"),"Sample loaded — press BUILD (tick 'Skip stock' if you "
+        +"have no API keys).", true);
+  };
+  $("build").onclick = doBuild;
+  $("preview").onclick = doPreview;
+  $("uploadpersona").onclick = uploadPersona;
+  $("stop").onclick = ()=>jobAction("/api/stop",{});
+  $("rerun").onclick = ()=>{ if(confirm("Re-run this job with its saved "
+      +"settings? (resume keeps finished segments)")) jobAction("/api/rerun",{}); };
+  $("verify").onclick = doVerify;
+  $("closelog").onclick = ()=>$("logpanel").classList.add("hide");
+
+  try{
+    S.cfg = await jget("/api/config");
+    renderChips(); renderPersonas(); updatePlan();
+    if(!S.cfg.rembg){
+      $("cutbg").checked = false;
+      $("cuthint").textContent = "(needs: pip install rembg onnxruntime)";
+    }
+  }catch(e){ msg($("buildmsg"),"config load failed: "+e.message); }
+  loadVoices();          // slow (network) — don't block first paint
+  await refreshJobs();
+  updatePlan();
+  setInterval(tick, 2000);
+}
+
+function renderChips(){
+  const c = S.cfg;
+  $("chips").innerHTML =
+    `<span class="chip">work <b title="${esc(c.work_dir)}">${esc(c.work_dir)}</b></span>`
+    + `<span class="chip">pixabay <b class="${c.stock_keys.pixabay?"ok":"no"}">${c.stock_keys.pixabay?"✓":"✗"}</b></span>`
+    + `<span class="chip">pexels <b class="${c.stock_keys.pexels?"ok":"no"}">${c.stock_keys.pexels?"✓":"✗"}</b></span>`
+    + (c.disk_free_gb!=null?`<span class="chip">disk <b>${c.disk_free_gb} GB</b> free</span>`:"");
+}
+function renderPersonas(){
+  const sel = $("persona");
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— none (footage only) —</option>';
+  for(const p of S.cfg.personas){
+    const o = document.createElement("option");
+    o.value = p.path; o.textContent = `${p.name} (${p.images} pose${p.images>1?"s":""})`;
+    sel.appendChild(o);
+  }
+  if([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+}
+async function uploadPersona(){
+  const f = $("personafile").files[0];
+  if(!f){ msg($("upmsg"),"choose a photo file first"); return; }
+  const cut = $("cutbg").checked;
+  const btn = $("uploadpersona"); btn.disabled = true;
+  msg($("upmsg"), cut ? "cutting out background… (AI — first run can take "
+      +"a minute)" : "converting…", true);
+  try{
+    const nm = encodeURIComponent(f.name.replace(/\.[^.]+$/,""));
+    const r = await fetch(`/api/persona?name=${nm}&cut=${cut?"1":"0"}`,
+      {method:"POST", headers:{"Content-Type":"application/octet-stream"},
+       body:f});
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error || ("HTTP "+r.status));
+    const p = j.persona;
+    S.cfg = await jget("/api/config");   // refresh persona list
+    renderPersonas();
+    $("persona").value = p.path;         // select the new one
+    msg($("upmsg"), p.cut
+      ? `background removed ✓ — "${p.name}" selected as persona`
+      : `saved ✓ — "${p.name}" selected. No cutout: the photo will show as `
+        +"a rectangle over the footage.", p.cut);
+  }catch(e){ msg($("upmsg"), e.message); }
+  finally{ btn.disabled = false; }
+}
+async function loadVoices(){
+  try{
+    const vs = await jget("/api/voices");
+    const sel = $("voice"); sel.innerHTML="";
+    const groups = {};
+    for(const v of vs){ (groups[v.Locale||"?"] ||= []).push(v); }
+    for(const loc of Object.keys(groups).sort()){
+      const g = document.createElement("optgroup"); g.label = loc;
+      for(const v of groups[loc]){
+        const o = document.createElement("option");
+        o.value = v.ShortName;
+        o.textContent = `${v.ShortName} · ${v.Gender}`;
+        if(v.ShortName === "en-US-ChristopherNeural") o.selected = true;
+        g.appendChild(o);
+      }
+      sel.appendChild(g);
+    }
+  }catch(e){ /* fallback list already covers defaults server-side */ }
+}
+
+// ---------- actions ----------
+async function doBuild(){
+  if(S.busy) return; S.busy = true;
+  const btn = $("build"); btn.disabled = true;
+  msg($("buildmsg"),"");
+  updatePlan();
+  try{
+    const a = gather();
+    if(!a.job_id) throw new Error("give the job an ID first");
+    if(!a.script_text.trim()) throw new Error("paste a script first");
+    if(S.disk === "bad" && !confirm(
+        "Disk looks too low for this length — the build can fill the "
+        +"drive and fail partway through.\n\nBuild anyway?")) {
+      return;
+    }
+    const r = await jpost("/api/build", a);
+    msg($("buildmsg"), `Build started — job "${r.job_id}" (pid ${r.pid}). `
+        +"Watch the log below; you can close this page, the build keeps running.", true);
+    selectJob(r.job_id);
+  }catch(e){ msg($("buildmsg"), e.message); }
+  finally{ btn.disabled=false; S.busy=false; }
+}
+async function doPreview(){
+  const text = $("script").value.split(/\n+/).map(s=>s.trim()).filter(Boolean)[0] || "";
+  msg($("pvmsg"),"synthesizing…", true);
+  try{
+    const r = await jpost("/api/preview", {text: text.slice(0,300),
+      voice: $("voice").value, speed: parseFloat($("speed").value)});
+    const p = $("player"); p.src = r.url; p.classList.remove("hide");
+    p.play().catch(()=>{});
+    msg($("pvmsg"), `preview: ${r.seconds}s of audio`, true);
+  }catch(e){ msg($("pvmsg"), e.message); }
+}
+async function jobAction(url, extra){
+  if(!S.sel) return;
+  try{
+    const r = await jpost(url, {job_id:S.sel, ...extra});
+    if(r.output!=null){ appendLog("\n=== verify "+S.sel+" ===\n"+r.output+"\n"); }
+    await refreshJobs(); renderActive();
+    if(url==="/api/rerun"){ selectJob(S.sel, true); }
+  }catch(e){ msg($("jobmsg"), e.message); }
+}
+async function doVerify(){
+  $("verify").disabled = true;
+  $("logpanel").classList.remove("hide");
+  appendLog("\n=== verifying "+S.sel+" (few seconds…) ===\n");
+  try{ await jobAction("/api/verify", {}); }
+  finally{ $("verify").disabled = false; }
+}
+
+// ---------- jobs list + active panel ----------
+async function refreshJobs(){
+  try{ S.jobs = await jget("/api/jobs"); }catch(e){ return; }
+  renderJobs(); renderActive();
+}
+function statusOf(j){
+  if(j.running) return ["run","RUNNING"];
+  if(j.returncode===0) return ["done","FINISHED"];
+  if(j.returncode!=null) return ["fail","FAILED rc="+j.returncode];
+  if(j.progress>=1 && j.mp4) return ["done","DONE"];
+  if(j.segments && j.segments.failed) return ["fail","FAILED SEGS"];
+  if(j.segments_total) return ["idle","PARTIAL"];
+  return ["idle","IDLE"];
+}
+function renderJobs(){
+  const tb = $("jobs"); tb.innerHTML = "";
+  for(const j of S.jobs){
+    const [cls,label] = statusOf(j);
+    const tr = document.createElement("tr");
+    if(j.job_id===S.sel) tr.className = "sel";
+    tr.innerHTML =
+      `<td><a href="#" class="dl" data-j="${esc(j.job_id)}">${esc(j.job_id)}</a></td>`
+      + `<td><span class="badge ${cls}">${label}</span></td>`
+      + `<td><div class="bar"><i style="width:${Math.round(j.progress*100)}%"></i></div>`
+      + ` <span style="color:var(--dim);font-size:11px">${j.segments.done||0}/${j.segments_total||0} seg</span></td>`
+      + `<td style="color:var(--dim)">${fmtAgo(j.updated)}</td>`
+      + `<td>${j.mp4 ? `<a class="dl" target="_blank" rel="noopener" href="${j.mp4.url}">${fmtSize(j.mp4.size)}</a>` : "—"}</td>`;
+    tr.querySelector("a[data-j]").onclick = e=>{e.preventDefault();
+      selectJob(j.job_id);};
+    tb.appendChild(tr);
+  }
+}
+function phaseText(j){
+  const pd = j.phases_done||[];
+  if(pd.includes("concat")) return "final mp4 assembled ✓";
+  if(j.segments_total){
+    const d=j.segments.done||0, r=j.segments.rendering||0, f=j.segments.failed||0;
+    let s = `rendering segments ${d}/${j.segments_total}`;
+    if(r) s += ` · ${r} in progress`;
+    if(f) s += ` · ${f} FAILED`;
+    return s;
+  }
+  if(pd.includes("loudness")) return "searching / downloading stock footage…";
+  if(pd.includes("timeline")) return "measuring loudness…";
+  return "synthesizing narration (TTS)…";
+}
+function renderActive(){
+  const j = S.jobs.find(x=>x.job_id===S.sel);
+  const box = $("active");
+  if(!j){ box.classList.add("hide"); return; }
+  box.classList.remove("hide");
+  $("ajid").textContent = j.job_id;
+  const [cls,label] = statusOf(j);
+  $("abadge").innerHTML = `<span class="badge ${cls}">${label}</span>`;
+  $("abar").style.width = Math.max(j.progress*100, j.running?2:0)+"%";
+  $("phase").textContent = phaseText(j)
+    + (j.ui ? "" : "  ·  CLI job — re-run from its original command");
+  $("stop").classList.toggle("hide", !j.running);
+  $("rerun").classList.toggle("hide", !j.ui);
+  const a = $("amp4");
+  if(j.mp4){ a.classList.remove("hide"); a.href = j.mp4.url;
+    a.textContent = `▶ Open mp4 (${fmtSize(j.mp4.size)})`; }
+  else a.classList.add("hide");
+}
+
+// ---------- log ----------
+function selectJob(id, keepLog){
+  if(S.sel!==id || !keepLog){
+    S.sel = id; S.offset = 0; S.log = ""; $("log").textContent="";
+  }
+  $("ljid").textContent = id;
+  $("logpanel").classList.remove("hide");
+  renderJobs(); renderActive(); pollLog(true);
+}
+function appendLog(text){
+  S.log += text;
+  if(S.log.length > 400000) S.log = S.log.slice(-300000);
+  const pre = $("log");
+  const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 60;
+  pre.textContent = S.log;
+  if(atBottom || $("autoscroll").checked) pre.scrollTop = pre.scrollHeight;
+}
+async function pollLog(catchUp){
+  if(!S.sel) return;
+  for(let i=0;i<(catchUp?8:1);i++){
+    try{
+      const r = await jget("/api/log?job="+encodeURIComponent(S.sel)
+        +"&offset="+S.offset);
+      if(r.text) appendLog(r.text);
+      S.offset = r.offset;
+      if(r.offset >= r.size) break;
+    }catch(e){ break; }
+  }
+}
+async function tick(){
+  await refreshJobs();
+  if(S.sel && !$("logpanel").classList.contains("hide")) pollLog(false);
+}
+init();
+</script>
+</body>
+</html>
